@@ -209,7 +209,31 @@ UIS.InputEnded:Connect(function(InputObject)
 	end
 	if InputObject.KeyCode == Enum.KeyCode.J then
 		--Anchor
-		if GetLength(Anchors) > 0 then
+		local Mode = 0
+		for i,Anchor in pairs(Anchors) do
+			if Anchor[1] then
+				Mode = 1
+			end
+		end
+		for i,Anchor in pairs(AnchorTargets) do
+			if Anchor and not Anchors[Anchor] then
+				Mode = 0
+			end
+		end
+		if Mode == 0 then
+			for i,Anchor in pairs(Anchors) do
+				local Found = false
+				for i,Tar in pairs(AnchorTargets) do
+					if Tar == Anchor[1] then
+						Found = true
+					end
+				end
+				if not Found then
+					table.insert(AnchorTargets,#AnchorTargets+1,Anchor[1])
+				end
+			end
+		end
+		if Mode == 1 then
 			local did = false
 			for i,Anchor in pairs(Anchors) do
 				if Anchor[1] then
@@ -234,7 +258,7 @@ UIS.InputEnded:Connect(function(InputObject)
 		else
 			local did = false
 			for i,TargetBrick in pairs(AnchorTargets) do
-				if TargetBrick then
+				if TargetBrick and not Anchors[TargetBrick] then
 					Anchors[TargetBrick] = {TargetBrick,TargetBrick.CFrame,TargetBrick.Color,TargetBrick.Velocity,TargetBrick.RotVelocity}
 					TargetBrick.Color = Color3.new(0,0,1)
 					did = true
@@ -262,6 +286,8 @@ end
 function Step2(FrameTime)
 	UpdateVisual(FrameTime)
 end
+
+print("test2")
 
 game:GetService("RunService").RenderStepped:Connect(InitStep)
 game:GetService("RunService").RenderStepped:Connect(Step2)
