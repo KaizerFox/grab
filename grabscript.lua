@@ -1,135 +1,150 @@
-game:GetService("Players").LocalPlayer.MaximumSimulationRadius=100000
-game:GetService("Players").LocalPlayer.SimulationRadius=100000
-local held = false
-local m = game:GetService("Players").LocalPlayer:GetMouse()
-local d=0
-local part
-local p = Instance.new("Part")
-p.Parent = game
-local a = Instance.new("Attachment")
-a.Parent = p
-local function cd(vec)
-	local invSqrt = 1 / math.sqrt(vec.magnitude * vec.magnitude)
-	return Vector3.new(vec.x * invSqrt, vec.y * invSqrt, vec.z * invSqrt)
+--Written By Hexa
+
+--Rewritten because the old script i made in like 2018 was bad lol
+
+--Config
+local ZoomStudsPerSecond = 30 --Controls the speed that the distance changes when pressing + or - when dragging a physics object
+local IgnoreCharacter = false
+local MaxParts = 20
+local Disable_Collision = true
+local Range = 4
+--Script
+local TargetBricks = {}
+local TargetPos
+local Distance = 0
+local Transparencys = {}
+local CanCollides = {}
+local CurZoom = 0
+
+local Mouse = game:GetService("Players").LocalPlayer:GetMouse()
+local UIS = game:GetService("UserInputService")
+
+function Lerp(PointA,PointB,Alpha)
+	return PointA * (1-Alpha) + PointB * Alpha
 end
-local bp = Instance.new("BodyPosition")
-bp.Parent = game
-bp.D = 150
-bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-local bg = Instance.new("BodyGyro")
-bg.Parent = game
-bg.D = 100
-bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-local rot=Vector3.new(0,0,0)
-m.Button1Down:connect(function()
-	held = true
-	part=m.Target
-	local notcanhoverable=false
-	if part then
-		if m.Target.CanCollide == false then
-			notcanhoverable = true
+
+function UpdateVelocity(FrameTime)
+	for i,TargetBrick in pairs(TargetBricks) do
+		if (not TargetBrick) or (TargetBrick and not TargetPos) then
+			return
+		end
+		TargetBrick.Velocity = (TargetPos - TargetBrick.CFrame.Position)*workspace:GetRealPhysicsFPS()
+	end
+end
+
+function UpdateTargetPos(FrameTime)
+	CurZoom = math.clamp(CurZoom,-1,1)
+	Distance = Distance + ((CurZoom*FrameTime)*ZoomStudsPerSecond)
+	TargetPos = ((Mouse.Hit.Position - workspace.CurrentCamera.CFrame.Position).Unit*Distance) + workspace.CurrentCamera.CFrame.Position
+end
+
+function TakeNetworkOwnership(FrameTime)
+	if (game:GetService("RunService"):IsStudio()) or (#TargetBricks==0) then
+		return
+	end
+	game:GetService("Players").LocalPlayer.MaximumSimulationRadius=100000
+	game:GetService("Players").LocalPlayer.SimulationRadius=100000
+end
+
+function UpdateVisual(FrameTime)
+	for i,TargetBrick in pairs(TargetBricks) do
+		if (not TargetBrick) or (TargetBrick and not TargetPos) then
+			return
+		end
+		TargetBrick.Transparency = Lerp(Transparencys[TargetBrick],1,.5)
+		if Disable_Collision then
+			TargetBrick.CanCollide = false
 		end
 	end
-	if notcanhoverable then
-		m.Target.CanCollide = true
-	end
-	d=(workspace.CurrentCamera.CFrame.Position-m.Target.Position).magnitude
-	if notcanhoverable then
-		m.Target.CanCollide = false
-	end
-	p.CFrame = workspace.CurrentCamera.CFrame
-	a.Orientation = p.Orientation
-	a.Position = (m.Target.Position)-p.Position
-	a.Position = Vector3.new(0,0,d*-1)
-	p.Orientation = part.Orientation
-	bg.CFrame = p.CFrame
-	p.CFrame = workspace.CurrentCamera.CFrame
-	rot=part.Orientation
-end)
-m.Button1Up:connect(function()
-	held = false
-	bp.Parent = game
-	bg.Parent = game
-end)
-local add=0
-local addrot=Vector3.new(0,0,0)
-game:GetService("RunService").RenderStepped:Connect(function(step)
-	d=d+(add*(step*25))
-	d=d+(add*(step*25))
-	rot=rot+(addrot*(step*1000))
-	if held then
-			if part.Anchored == false then
-				p.CFrame = CFrame.new(p.Position,  p.Position + cd(m.Hit.Position-workspace.CurrentCamera.CFrame.Position))
-				p.Orientation = p.Orientation
-				p.CFrame = p.CFrame - p.Position + workspace.CurrentCamera.CFrame.Position
-				a.Orientation = p.Orientation
-				a.Position = (part.Position)-p.Position
-				a.Position = Vector3.new(0,0,d*-1)
-				local b = part.CFrame
-				part.CFrame = part.CFrame - part.CFrame.Position + a.WorldPosition
-				bp.Position = part.Position
-				part.CFrame = b
-				bp.Parent = part
-				bg.Parent = part
-				p.Orientation = rot
-				bg.CFrame = p.CFrame
-			else
-				part=m.Target
-			end
-		else
-			part=m.Target
+end
 
+function HandleBrick(TargetBrick)
+	local roblox_is_fucking_retarded = false
+	if TargetBrick == nil then
+		roblox_is_fucking_retarded = true
+	else
+		if not TargetBrick:IsA("BasePart") then
+			roblox_is_fucking_retarded = true
+		end
+		if roblox_is_fucking_retarded or TargetBrick:IsA("Terrain") then
+			roblox_is_fucking_retarded = true
+		end
+		if roblox_is_fucking_retarded or TargetBrick.Anchored then
+			roblox_is_fucking_retarded = true
+		end
+	end
+	if not roblox_is_fucking_retarded then
+		Transparencys[TargetBrick] = TargetBrick.Transparency
+		CanCollides[TargetBrick] = TargetBrick.CanCollide
+		Distance = (workspace.CurrentCamera.CFrame.Position-TargetBrick.Position).Magnitude
+	else
+		TargetBrick = nil
+	end
+	return TargetBrick
+end
+
+Mouse.Button1Down:Connect(function()
+	if Mouse.Hit then
+		local Region = Region3.new(
+			Vector3.new(-Range,-Range,-Range)+Mouse.Hit.Position,
+			Vector3.new(Range,Range,Range)+Mouse.Hit.Position
+		)
+		local Parts
+		if IgnoreCharacter then
+			Parts = workspace:FindPartsInRegion3WithIgnoreList(Region,{game:GetService("Players").LocalPlayer.Character},MaxParts)
+		else
+			Parts = workspace:FindPartsInRegion3(Region,nil,MaxParts)
+		end
+		for i,Part in pairs(Parts) do
+			local Result = HandleBrick(Part)
+			if Result then
+				table.insert(TargetBricks,#TargetBricks+1,Result)
+			end
+		end
 	end
 end)
-game:GetService("Players").LocalPlayer:GetMouse().KeyDown:connect(function(key)
-	if key == "=" then
-		add=add+1
+
+Mouse.Button1Up:Connect(function()
+	for i,brick in pairs(TargetBricks) do
+		if brick then
+			brick.Transparency = Transparencys[brick]
+			brick.CanCollide = CanCollides[brick]
+		end
 	end
-	if key == "-" then
-		add=add-1
+	TargetBricks = {}
+	Transparencys = {}
+	Distance = 0
+end)
+
+UIS.InputBegan:Connect(function(InputObject)
+	if InputObject.KeyCode == Enum.KeyCode.Equals then
+		CurZoom = CurZoom + 1
 	end
-	if key == "t" and false then
-		addrot=addrot+Vector3.new(-1,0,0)
-	end
-	if key == "f" and false then
-		addrot=addrot+Vector3.new(0,0,1)
-	end
-	if key == "g" and false then
-		addrot=addrot+Vector3.new(1,0,0)
-	end
-	if key == "h" and false then
-		addrot=addrot+Vector3.new(0,0,-1)
-	end
-	if key == "r" and false then
-		addrot=addrot+Vector3.new(0,1,0)
-	end
-	if key == "y" and false then
-		addrot=addrot+Vector3.new(0,-1,0)
+		if InputObject.KeyCode == Enum.KeyCode.Minus then
+		CurZoom = CurZoom - 1
 	end
 end)
-game:GetService("Players").LocalPlayer:GetMouse().KeyUp:connect(function(key)
-	if key == "=" then
-		add=add-1
+
+UIS.InputEnded:Connect(function(InputObject)
+	if InputObject.KeyCode == Enum.KeyCode.Equals then
+		CurZoom = CurZoom - 1
 	end
-	if key == "-" then
-		add=add+1
-	end
-	if key == "t" and false then
-		addrot=addrot-Vector3.new(-1,0,0)
-	end
-	if key == "f" and false then
-		addrot=addrot-Vector3.new(0,0,1)
-	end
-	if key == "g" and false then
-		addrot=addrot-Vector3.new(1,0,0)
-	end
-	if key == "h" and false then
-		addrot=addrot-Vector3.new(0,0,-1)
-	end
-	if key == "r" and false then
-		addrot=addrot-Vector3.new(0,1,0)
-	end
-	if key == "y" and false then
-		addrot=addrot-Vector3.new(0,-1,0)
+		if InputObject.KeyCode == Enum.KeyCode.Minus then
+		CurZoom = CurZoom + 1
 	end
 end)
+
+function InitStep(FrameTime)
+	UpdateTargetPos(FrameTime)
+	TakeNetworkOwnership(FrameTime)
+	UpdateVelocity(FrameTime)
+end
+
+function Step2(FrameTime)
+	UpdateVisual(FrameTime)
+end
+
+game:GetService("RunService").RenderStepped:Connect(InitStep)
+game:GetService("RunService").RenderStepped:Connect(Step2)
+game:GetService("RunService").Heartbeat:Connect(Step2)
+game:GetService("RunService").Stepped:Connect(Step2)
