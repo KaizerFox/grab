@@ -48,6 +48,7 @@ function GetLength(Table)
 end
 
 function UpdateVelocity(FrameTime)
+	FrameTime = 1/120
 	for i,TargetBrick in pairs(TargetBricks) do
 		if (not TargetBrick) or (TargetBrick and not TargetPos) then
 			return
@@ -79,11 +80,26 @@ function UpdateTarget(FrameTime)
 end
 
 function TakeNetworkOwnership(FrameTime)
-	if (game:GetService("RunService"):IsStudio()) or (#TargetBricks==0) then
-		return
-	end
-	sethiddenproperty(game:GetService("Players").LocalPlayer,"MaximumSimulationRadius","100000")
-	sethiddenproperty(game:GetService("Players").LocalPlayer,"SimulationRadiuss","100000")
+    return
+	--if (game:GetService("RunService"):IsStudio()) or (#TargetBricks==0) then
+	--	return
+	--end
+    --game:GetService("Players").LocalPlayer.MaximumSimulationRadius=100000000000
+    --sethiddenproperty(game:GetService("Players").LocalPlayer,"SimulationRadius",100000000000)
+    --settings().Physics.AllowSleep = false
+    --settings().Physics.ThrottleAdjustTime = 1
+    --settings().Physics.PhysicsEnvironmentalThrottle = 1
+end
+function UnTakeNetworkOwnership(FrameTime)
+    --return
+	--if (game:GetService("RunService"):IsStudio()) or (#TargetBricks>0) then
+	--	return
+	--end
+    --game:GetService("Players").LocalPlayer.MaximumSimulationRadius=1000
+    --sethiddenproperty(game:GetService("Players").LocalPlayer,"SimulationRadius",15)
+    --settings().Physics.AllowSleep = true
+    --settings().Physics.ThrottleAdjustTime = 1
+    --settings().Physics.PhysicsEnvironmentalThrottle = 0
 end
 
 function UpdateVisual(FrameTime)
@@ -130,7 +146,7 @@ Mouse.Button1Down:Connect(function()
 			Vector3.new(Range,Range,Range)+Mouse.Hit.Position
 		)
 		local Parts
-		if IgnoreCharacter then
+		if IgnoreCharacter and not _G.freecam then
 			Parts = workspace:FindPartsInRegion3WithIgnoreList(Region,{game:GetService("Players").LocalPlayer.Character},MaxParts)
 		else
 			Parts = workspace:FindPartsInRegion3(Region,nil,MaxParts)
@@ -182,6 +198,12 @@ UIS.InputBegan:Connect(function(InputObject)
 		--RotRight
 		CurRot = CurRot + Vector3.new(0,0,-1)
 	end
+	if InputObject.KeyCode == Enum.KeyCode.R then
+		CurRot = CurRot + Vector3.new(0,-1,0)
+	end
+	if InputObject.KeyCode == Enum.KeyCode.Y then
+		CurRot = CurRot + Vector3.new(0,1,0)
+	end	
 end)
 
 UIS.InputEnded:Connect(function(InputObject)
@@ -207,6 +229,12 @@ UIS.InputEnded:Connect(function(InputObject)
 		--RotRight
 		CurRot = CurRot + Vector3.new(0,0,1)
 	end
+	if InputObject.KeyCode == Enum.KeyCode.R then
+		CurRot = CurRot + Vector3.new(0,1,0)
+	end
+	if InputObject.KeyCode == Enum.KeyCode.Y then
+		CurRot = CurRot + Vector3.new(0,-1,0)
+	end	
 	if InputObject.KeyCode == Enum.KeyCode.J then
 		--Anchor
 		local Mode = 0
@@ -235,16 +263,44 @@ UIS.InputEnded:Connect(function(InputObject)
 		end
 		if Mode == 1 then
 			local did = false
-			for i,Anchor in pairs(Anchors) do
-				if Anchor[1] then
-					Anchor[1].CFrame = Anchor[2]
-					Anchor[1].Color = Anchor[3]
-					Anchor[1].Velocity = Anchor[4]
-					Anchor[1].RotVelocity = Anchor[5]
-					did = true
+			print(#TargetBricks)
+			local Keep = {}
+			local KeepTar = {}
+			if #TargetBricks == 0 then
+				for i,Anchor in pairs(Anchors) do
+					if Anchor[1] then
+						Anchor[1].CFrame = Anchor[2]
+						Anchor[1].Color = Anchor[3]
+						Anchor[1].Velocity = Anchor[4]
+						Anchor[1].RotVelocity = Anchor[5]
+						did = true
+					end
+				end
+			else
+				for i,Anchor in pairs(Anchors) do
+					local IsHeld = false
+					for _,Brick in pairs(TargetBricks) do
+						if Brick == Anchor[1] then
+							IsHeld = true
+							break
+						end
+					end
+					print(IsHeld)
+					if Anchor[1] and IsHeld then
+						print("is: " .. tostring(IsHeld))
+						Anchor[1].CFrame = Anchor[2]
+						Anchor[1].Color = Anchor[3]
+						Anchor[1].Velocity = Anchor[4]
+						Anchor[1].RotVelocity = Anchor[5]
+						did = true
+					else
+						Keep[Anchor[1]] = Anchor
+					end
+					table.insert(KeepTar,Anchor[1])
 				end
 			end
-			Anchors = {}
+			Anchors = Keep
+			AnchorTargets = KeepTar
 			if did then
 				local sfx = Instance.new("Sound",game.SoundService)
 				sfx.Volume = 1
@@ -279,7 +335,8 @@ end)
 
 function InitStep(FrameTime)
 	UpdateTarget(FrameTime)
-	TakeNetworkOwnership(FrameTime)
+	TakeNetworkOwnership(FrameTime) --roblox semi patched this :\
+	UnTakeNetworkOwnership()
 	UpdateVelocity(FrameTime)
 end
 
