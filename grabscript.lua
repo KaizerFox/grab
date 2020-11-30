@@ -82,8 +82,8 @@ function TakeNetworkOwnership(FrameTime)
 	if (game:GetService("RunService"):IsStudio()) or (#TargetBricks==0) then
 		return
 	end
-	game:GetService("Players").LocalPlayer.MaximumSimulationRadius=100000
-	game:GetService("Players").LocalPlayer.SimulationRadius=100000
+	sethiddenproperty(game:GetService("Players").LocalPlayer,"MaximumSimulationRadius","100000")
+	sethiddenproperty(game:GetService("Players").LocalPlayer,"SimulationRadiuss","100000")
 end
 
 function UpdateVisual(FrameTime)
